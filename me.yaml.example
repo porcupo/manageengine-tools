@@ -1,0 +1,5 @@
+:rest_endpoint: https://help.disney.private/sdpapi/request
+:rest_key: YOUR-KEY
+:servlet_endpoint:
+:servlet_login:
+:servlet_passwd:

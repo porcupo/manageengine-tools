@@ -1,0 +1,64 @@
+#!/usr/bin/env ruby
+
+require 'xmlsimple'
+require 'rest_client'
+require 'net/http'
+require 'yaml'
+require 'pp'
+
+begin
+  conf_file = Dir.pwd + '/me.yaml'
+  config = YAML.load_file(conf_file)
+rescue Errno::ENOENT
+  abort "Missing me.yaml!"
+end
+
+if (ARGV.nil? || ARGV.empty?)
+  puts "Use: #{$PROGRAM_NAME} <login> <Ticket Subject>"
+  abort "Ex: #{$PROGRAM_NAME} djo Help with cloudstack"
+else
+  user = ARGV.shift
+  subject = ARGV.join(" ")
+end
+
+template = "request-template.xml"
+
+ticket = {}
+ticket[:requesttemplate] = ["Default Request"]
+ticket[:requester] = ["Johnson, Doug"]
+ticket[:service] = ["Ops"]
+ticket[:subject] = [subject]
+ticket[:description] = [subject]
+ticket[:group] = ["DevOps"]
+ticket[:technician] = ["Johnson, Doug"]
+ticket[:status] = ["Open"]
+ticket[:requesttype] = ["Service Request"]
+
+begin
+  template_xml = XmlSimple.xml_in(template)
+rescue Exception => e
+  raise "ERROR: #{e.inspect}"
+end
+
+template_xml["Details"].first.keys.each do |key|
+  template_xml["Details"].first[key] = ticket[key.to_sym] unless ticket[key.to_sym].nil?
+end
+
+begin
+  xml_out = XmlSimple.xml_out(template_xml, {"AttrPrefix" => true, "RootName" => "Operation"})
+rescue ArgumentError => e
+  raise "ERROR: #{e.inspect}"
+end
+
+begin
+  reply = RestClient.post config[:rest_endpoint],
+      :OPERATION_NAME => 'ADD_REQUEST',
+      :TECHNICIAN_KEY => config[:rest_key],
+      :INPUT_DATA => xml_out
+rescue Exception => e
+  raise "#{e.inspect}"
+end
+
+xmlreply = XmlSimple.xml_in(reply)
+reply = xmlreply['response'][0]['operation'][0]
+puts 'Ticket: https://help.example.com/WorkOrder.do?woMode=viewWO&woID=' + reply['Details'][0]['workorderid'][0]
